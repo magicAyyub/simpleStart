@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Data Display with Result Counter</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8 text-center">Dynamic search</h1>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <!-- Quick Search with Result Counter -->
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">Quick Search</h2>
+                <input type="text" id="quickSearch" placeholder="Search by name, firstname, or email" class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <div id="resultCount" class="mt-2 text-sm text-gray-600">
+                    Showing <span id="currentCount" class="font-semibold"></span> of <span id="totalCount" class="font-semibold"></span> results
+                </div>
+            </div>
+            
+            <!-- Enhanced CSV Upload -->
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">CSV Upload</h2>
+                <form id="csvUploadForm" action="{{ url_for('upload_csv') }}" method="post" enctype="multipart/form-data" class="space-y-4">
+                    <div class="flex items-center justify-center w-full">
+                        <label for="csv_file" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                                <svg class="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 20 16">
+                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                                </svg>
+                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                                <p class="text-xs text-gray-500">CSV file only</p>
+                            </div>
+                            <input id="csv_file" name="csv_file" type="file" class="hidden" accept=".csv" />
+                        </label>
+                    </div>
+                    <div id="file-name" class="text-sm text-gray-500"></div>
+                    <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Upload CSV</button>
+                </form>
+            </div>
+            
+            <!-- Email Regex Filter -->
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h2 class="text-xl font-semibold mb-4">Email Regex Filter</h2>
+                <input type="text" id="emailRegex" placeholder="Enter regex pattern" class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2">
+                <button id="applyRegex" class="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition duration-300">Apply Filter</button>
+            </div>
+        </div>
+        
+        <!-- Data Table -->
+        <div class="bg-white rounded-lg shadow overflow-x-auto">
+            <table class="w-full table-auto">
+                <thead class="bg-gray-200">
+                    <tr>
+                        {% for header in headers %}
+                        <th class="px-4 py-2 text-left">{{ header }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data %}
+                    <tr class="{% if loop.index % 2 == 0 %}bg-gray-50{% endif %} hover:bg-gray-100">
+                        {% for key, value in row.items() %}
+                        <td class="px-4 py-2">{{ value }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const rows = document.querySelectorAll('tbody tr');
+        const totalCount = rows.length;
+        const currentCountElement = document.getElementById('currentCount');
+        const totalCountElement = document.getElementById('totalCount');
+
+        // Initialize the result count
+        currentCountElement.textContent = totalCount;
+        totalCountElement.textContent = totalCount;
+
+        // Smooth counter animation function
+        function animateCounter(start, end, element, duration) {
+            let startTimestamp = null;
+            const step = (timestamp) => {
+                if (!startTimestamp) startTimestamp = timestamp;
+                const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                const current = Math.floor(progress * (end - start) + start);
+                element.textContent = current;
+                if (progress < 1) {
+                    window.requestAnimationFrame(step);
+                }
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        // Quick Search functionality with smooth counter update
+        document.getElementById('quickSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const text = row.textContent.toLowerCase();
+                const isVisible = text.includes(searchTerm);
+                row.style.display = isVisible ? '' : 'none';
+                if (isVisible) visibleCount++;
+            });
+
+            animateCounter(parseInt(currentCountElement.textContent), visibleCount, currentCountElement, 200);
+        });
+
+        // Email Regex Filter functionality with smooth counter update
+        document.getElementById('applyRegex').addEventListener('click', function() {
+            const regexPattern = document.getElementById('emailRegex').value;
+            let visibleCount = 0;
+            
+            rows.forEach(row => {
+                const emailCell = row.querySelector('td:nth-child(3)'); // Assuming email is in the third column
+                if (emailCell) {
+                    const email = emailCell.textContent;
+                    const regex = new RegExp(regexPattern);
+                    const isVisible = regex.test(email);
+                    row.style.display = isVisible ? '' : 'none';
+                    if (isVisible) visibleCount++;
+                }
+            });
+
+            animateCounter(parseInt(currentCountElement.textContent), visibleCount, currentCountElement, 200);
+        });
+
+        // Enhanced CSV Upload functionality
+        const fileInput = document.getElementById('csv_file');
+        const fileName = document.getElementById('file-name');
+        const uploadButton = document.querySelector('button[type="submit"]');
+
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                fileName.textContent = `File selected: ${e.target.files[0].name}`;
+                uploadButton.disabled = false;
+            } else {
+                fileName.textContent = '';
+                uploadButton.disabled = true;
+            }
+        });
+
+        // Drag and drop functionality
+        const dropZone = document.querySelector('label[for="csv_file"]');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            dropZone.classList.add('border-blue-500');
+        }
+
+        function unhighlight(e) {
+            dropZone.classList.remove('border-blue-500');
+        }
+
+        dropZone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            fileInput.files = files;
+            
+            if (files.length > 0) {
+                fileName.textContent = `File selected: ${files[0].name}`;
+                uploadButton.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

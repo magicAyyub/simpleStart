@@ -26,7 +26,6 @@ __pycache__
 *.sqlite3-journal
 *.idea
 *.vscode
-*.env
 *.venv
 *venv
 *.rdb
