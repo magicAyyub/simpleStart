@@ -14,7 +14,7 @@ def index():
     # Chaîne de connexion directe pour Dask
     connection_string = "mysql://user:password@localhost:3306/db"
 
-    # Lire la table en spécifiant "ID_CCU" comme index
+    # Lire les 1000 première lignes de la  table en spécifiant "ID_CCU" comme index
     df = dd.read_sql_table("data", connection_string, index_col="id")
 
     # Convertir le Dask DataFrame en Pandas DataFrame
@@ -28,7 +28,11 @@ def index():
     headers = df_pandas.columns.tolist()
     return render_template("index.html", data=data, headers=headers)
 
+@app.route("/upload", methods=["GET"])
+def upload():
+    return render_template("upload.html")
 
+# Route pour traiter l'upload
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
    if 'csv_file' not in request.files:
@@ -42,6 +46,19 @@ def upload_csv():
        headers = df.columns.tolist()
        return render_template('index.html', data=data, headers=headers)
    return 'Invalid file type'
+
+# Route pour traiter l'upload
+@app.route("/upload", methods=["POST"])
+def upload_file():
+    if request.method == "POST":
+        file = request.files["upload_file"]
+        file_path = os.path.join("./uploads", file.filename)
+        file.save(file_path)
+        # Lancer le traitement et chargement en BDD
+        load_data_to_db(file_path)
+        # Supprimer le fichier après traitement
+        os.remove(file_path)
+        return "Fichier chargé et traité avec succès."
 
 if __name__ == "__main__":
     app.run(debug=True)
