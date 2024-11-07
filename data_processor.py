@@ -80,3 +80,6 @@ def read_large_file(file, chunk_size: int = 1024 * 1024):
         lines = chunk.splitlines()
         processed_lines = [process_line(line) for line in lines if process_line(line)]
         yield processed_lines
+
+
+# UID = ID LIN

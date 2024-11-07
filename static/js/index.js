@@ -79,19 +79,26 @@ document.addEventListener('DOMContentLoaded', function() {
         updateVisibility(visibleCount);
     });
 
+    // Enhanced CSV Upload functionality
+    const fileName = document.getElementById('file-name');
+    const uploadButton = document.querySelector('button[type="submit"]');
+
+    fileInput.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+            fileName.textContent = `File selected: ${e.target.files[0].name}`;
+            uploadButton.disabled = false;
+        } else {
+            fileName.textContent = '';
+            uploadButton.disabled = true;
+        }
+    });
+
     // Clear search functionality
     clearSearchButton.addEventListener('click', function() {
         quickSearchInput.value = '';
         emailRegexInput.value = '';
         rows.forEach(row => row.style.display = '');
         updateVisibility(totalCount);
-    });
-
-    // File input change event
-    fileInput.addEventListener('change', function(e) {
-        if (e.target.files.length > 0) {
-            uploadForm.submit();
-        }
     });
 
     // Drag and drop functionality
@@ -128,9 +135,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const dt = e.dataTransfer;
         const files = dt.files;
         fileInput.files = files;
-        
         if (files.length > 0) {
-            uploadForm.submit();
+            fileName.textContent = `File selected: ${files[0].name}`;
+            uploadButton.disabled = false;
         }
     }
 });

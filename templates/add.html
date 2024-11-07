@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <title>Upload File</title>
+  </head>
+  <body class="bg-gray-100 p-4">
+    <div class="container mx-auto px-4 py-8 w-[500px]">
+        
+        <div class="flex items-center justify-center gap-8 mb-2">
+          <a href="/" class="text-red-600">
+            <--
+          </a>
+          <h1 class="text-3xl font-bold mb-8 text-center">Upload your txt data file</h1>
+      </div>
+      <div class="bg-white p-4 rounded-lg shadow">
+        <form id="fileUploadForm" action="/add" method="post" enctype="multipart/form-data" class="space-y-4">
+            <div class="flex items-center justify-center w-full">
+                <label for="upload_file" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                    <div class="flex flex-col items-center justify-center pt-5 pb-6">
+                        <svg class="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="
+                        http://www.w3.org/2000/svg"
+                        fill="none" viewBox="0 0 20 16">
+                            <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
+                        </svg>
+                        <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
+                        <p class="text-xs text-gray-500">TXT file only</p>
+                    </div>
+                    <input id="upload_file" name="upload_file" type="file" class="hidden" accept=".txt" />
+                </label>
+            </div>
+            <div id="file-name" class="text-sm text-gray-500"></div>
+            <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Upload CSV</button>
+        </form>
+      </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/upload.js') }}"></script>
+  </body>
+</html>
