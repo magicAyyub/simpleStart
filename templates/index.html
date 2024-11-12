@@ -1,107 +1,135 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data Interface</title>
+    <title>Data interface</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
 </head>
 <body class="bg-gray-100">
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-3xl font-bold mb-8 text-center">Data Interface</h1>
+    <div class="container mx-auto p-4 space-y-8 max-w-4xl">
+        <h1 class="text-3xl font-bold mb-6 text-center">Data interface</h1>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Quick Search Card -->
-            <div class="bg-white rounded-lg shadow p-6 flex flex-col h-[280px]">
-                <h2 class="text-xl font-semibold mb-4">Quick Search</h2>
-                <div class="flex-1 flex flex-col">
-                    <input type="text" id="quickSearch" placeholder="Search by name, firstname, or email" class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <div id="resultCount" class="mt-2 text-sm text-gray-600">
-                        Showing <span id="currentCount" class="font-semibold">998</span> of <span id="totalCount" class="font-semibold">998</span> results
-                    </div>
+        <div class="bg-white shadow-md rounded-lg p-6">
+
+            <!-- Search Type Selection -->
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold mb-4">Type de recherche</h2>
+                <div class="grid grid-cols-3 gap-4 max-w-md mx-auto">
+                    <button id="simpleSearch" class="search-option aspect-square flex flex-col items-center justify-center p-6 rounded-lg bg-white text-gray-800 border-2 border-gray-200 hover:bg-black hover:text-white transition-all duration-300">
+                        <svg class="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        Simple
+                    </button>
+                    <button id="csvSearch" class="search-option aspect-square flex flex-col items-center justify-center p-6 rounded-lg bg-white text-gray-800 border-2 border-gray-200 hover:bg-black hover:text-white transition-all duration-300">
+                        <svg class="w-6 h-6 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                        </svg>
+                        CSV
+                    </button>
+                    <button id="regexSearch" class="search-option aspect-square flex flex-col items-center justify-center p-6 rounded-lg bg-white text-gray-800 border-2 border-gray-200 hover:bg-black hover:text-white transition-all duration-300">
+                        <span class="text-xl mb-2">#</span>
+                        Regex
+                    </button>
                 </div>
             </div>
 
-            <!-- CSV Upload Card -->
-            <div class="bg-white p-4 rounded-lg shadow">
-                <h2 class="text-xl font-semibold mb-4">CSV Upload</h2>
-                <form id="csvUploadForm" action="{{ url_for('upload_csv') }}" method="post" enctype="multipart/form-data" class="space-y-4">
-                    <div class="flex items-center justify-center w-full">
-                        <label for="csv_file" class="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
-                            <div class="flex flex-col items-center justify-center pt-5 pb-6">
-                                <svg class="w-8 h-8 mb-4 text-gray-500" aria-hidden="true" xmlns="
-                                http://www.w3.org/2000/svg"
-                                fill="none" viewBox="0 0 20 16">
-                                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 13h3a3 3 0 0 0 0-6h-.025A5.56 5.56 0 0 0 16 6.5 5.5 5.5 0 0 0 5.207 5.021C5.137 5.017 5.071 5 5 5a4 4 0 0 0 0 8h2.167M10 15V6m0 0L8 8m2-2 2 2"/>
-                                </svg>
-                                <p class="mb-2 text-sm text-gray-500"><span class="font-semibold">Click to upload</span> or drag and drop</p>
-                                <p class="text-xs text-gray-500">CSV file only</p>
-                            </div>
-                            <input id="csv_file" name="csv_file" type="file" class="hidden" accept=".csv" />
+            <!-- Form to search-->
+            <form id="searchForm" class="space-y-4 max-w-2xl mx-auto">
+
+                <!-- Simple search -->
+                <div id="simpleSearchFields" class="hidden">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label for="nom" class="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                            <input type="text" id="nom" name="nom" placeholder="Ex: Dupont" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                        </div>
+                        <div>
+                            <label for="prenom" class="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                            <input type="text" id="prenom" name="prenom" placeholder="Ex: Marie" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <input type="email" id="email" name="email" placeholder="Ex: marie.dupont@email.com" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                    </div>
+                    <div id="moreFields" class="hidden space-y-4">
+                        <div>
+                            <label for="dateNaissance" class="block text-sm font-medium text-gray-700 mb-1">Date de naissance</label>
+                            <input type="date" id="dateNaissance" name="dateNaissance" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                        </div>
+                        <div>
+                            <label for="idccu" class="block text-sm font-medium text-gray-700 mb-1">ID CCU</label>
+                            <input type="text" id="idccu" name="idccu" placeholder="Ex: 123AB4567" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                        </div>
+                        <div>
+                            <label for="iduuid " class="block text-sm font-medium text-gray-700 mb-1">ID UUID</label>
+                            <input type="text" id="iduuid" name="iduuid" placeholder="Ex: 123AB4567" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                        </div>                                            
+                    </div>
+                </div>
+
+                <!-- CSV search -->
+                <div id="csvSearchFields" class="hidden">
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                        <p id="statusMessage"></p>
+                        <input type="file" id="csvFile"  accept=".csv" class="hidden">
+                        <label for="csvFile" class="cursor-pointer">
+                            <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                            </svg>
+                            <span class="mt-2 block text-sm font-medium text-gray-900">
+                                Cliquez pour sélectionner un fichier CSV ou glissez-déposez le ici
+                            </span>
                         </label>
                     </div>
-                    <div id="file-name" class="text-sm text-gray-500"></div>
-                    <button type="submit" class="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled>Upload CSV</button>
-                </form>
-            </div>
-
-            <!-- Email Regex Filter Card -->
-            <div class="bg-white rounded-lg shadow p-6 flex flex-col h-[280px]">
-                <h2 class="text-xl font-semibold mb-4">Email Regex Filter</h2>
-                <div class="flex-1 flex flex-col">
-                    <input type="text" id="emailRegex" placeholder="Enter regex pattern" class="w-full px-4 py-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <div id="resultCount" class="mt-2 text-sm text-gray-600">
-                        Ex : [a-zA-Z0-9._%+-]+@[a-zA-Z0-9]+\.(com|net|org|edu)
-                    </div>
-                    <button id="applyRegex" class="w-full mt-auto bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition-colors">Apply Filter</button>
+                    <p id="selectedFileName" class="mt-2 text-sm text-gray-600"></p>
                 </div>
+
+                <!-- Regex search -->
+                <div id="regexSearchFields" class="hidden">
+                    <div>
+                        <label for="regex" class="block text-sm font-medium text-gray-700 mb-1">Expression régulière pour les emails</label>
+                        <input type="text" id="regex" name="regex" placeholder="Ex: ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                    </div>
+                </div>
+
+                <div class="flex space-x-4">
+                    <button id="toggleMoreFields" type="button" class="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition duration-150 ease-in-out">
+                        <i class="fas fa-chevron-down mr-2"></i>
+                        Plus de critères
+                    </button>
+                    <button id="submitButton" type="submit" class="flex-1 px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition duration-150 ease-in-out">
+                        <i class="fas fa-search mr-2"></i>
+                        Lancer la recherche
+                    </button>
+                    <button id="uploadCSV" type="submit" class="hidden flex-1 px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition duration-150 ease-in-out">
+                        <i class="fas fa-search mr-2"></i>
+                        Upload CSV
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Display results -->
+        <div id="resultsSection" class="bg-white shadow-md rounded-lg p-6 mt-8 hidden">
+            <h2 class="text-xl font-semibold mb-4">Résultats de la recherche <span id="resultCount" class="bg-purple-100 text-purple-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-purple-900 dark:text-purple-300">0 Résultat</span></h2>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50" id="resultsHeader">
+                        <!-- Dynamic headers will be inserted here -->
+                    </thead>
+                    <tbody id="resultsBody" class="bg-white divide-y divide-gray-200">
+                        <!-- Dynamic results will be inserted here -->
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <!-- Data Table -->
-        <div class="flex items-center justify-end mt-8">
-            <button id="addDataBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition duration-300">
-                <a href="/add">Add</a>  
-            </button>
-        </div>
-        <div class="mt-4 bg-white rounded-lg shadow overflow-x-auto">
-            <table class="w-full table-auto">
-                <thead class="bg-gray-200">
-                    <tr>
-                        {% for header in headers %}
-                        <th class="px-4 py-2 text-left">{{ header }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in data %}
-                    <tr class="{% if loop.index % 2 == 0 %}bg-gray-50{% endif %} hover:bg-gray-100">
-                        {% for key, value in row.items() %}
-                        <td class="px-4 py-2">{{ value }}</td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <button id="scrollToTopBtn" class="fixed bottom-4 right-8 bg-blue-500 text-white p-2 rounded-full shadow hover:bg-blue-600 transition-colors focus:outline-none" title="Scroll to top">
-                <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18" />
-                </svg>
-            </button>
-        </div>
-
-        <!-- No Results Message -->
-        <div id="noResults" class="hidden mt-8 bg-white rounded-lg shadow p-8 text-center">
-            <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-                <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-            </svg>
-            <h3 class="mt-2 text-sm font-medium text-gray-900">No results found</h3>
-            <p class="mt-1 text-sm text-gray-500">Try adjusting your search or filter to find what you're looking for.</p>
-            <div class="mt-6">
-                <button type="button" id="clearSearch" class="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                    Clear search
-                </button>
-            </div>
+        <div class="text-center mt-8">
+            <span id="searchCount" class="text-lg font-semibold">0 recherches effectuées</span>
         </div>
     </div>
 

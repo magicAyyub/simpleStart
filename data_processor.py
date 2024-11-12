@@ -1,85 +1,61 @@
-import pandas as pd
 import re
-from sqlalchemy import create_engine, MetaData, Table, Column, String, Integer
-from sqlalchemy.exc import SQLAlchemyError
-from typing import List, Union
+import pandas as pd
+from typing import Generator, TextIO, Union
 
-# Connexion dynamique à MySQL via SQLAlchemy
-engine = create_engine("mysql://user:password@localhost:3306/db")
-
-
-def process_line(line: str) -> Union[List[str], None]:
+def read_by_chunk(
+    file_object: TextIO,  # le type de retour de open()
+    chunk_size: int = 4096,
+) -> Generator[str, None, None]:
     """
-    Nettoie et structure une ligne de texte.
-    """
-    if re.match(r"^[\-\+| ]+$", line):  # Ignore les lignes de séparateurs
-        return None
-    line = re.sub(r"\s*\|\s*", ",", line.strip())  # Replace pipes with commas
-    line = re.sub(r"\s+", " ", line)  # Reduce multiple spaces
-    columns = [col.strip() for col in line.split(",")]
-    return columns if any(columns) else None
-
-
-def detect_columns(file_path: str) -> List[str]:
-    """
-    Détecte les colonnes du fichier en analysant la première ligne de données.
-    """
-    with open(file_path, "r", encoding="utf-8") as file:
-        # Lire la première ligne pour obtenir les en-têtes
-        first_line = file.readline().strip()
-        columns = process_line(first_line)
-        return columns
-
-
-def update_table_structure(table_name: str, columns: List[str]):
-   """
-   Vérifie et adapte la structure de la table en fonction des colonnes détectées,
-   et place la colonne `id` en première position.
-   """
-   metadata = MetaData()
-   metadata.reflect(bind=engine)  # Associer le moteur au moment de la réflexion
-   if table_name in metadata.tables:
-       table = metadata.tables[table_name]
-       existing_columns = set(table.columns.keys())
-       # Ajouter les nouvelles colonnes manquantes
-       with engine.connect() as conn:
-           for col in columns:
-               if col not in existing_columns:
-                   alter_query = f'ALTER TABLE {table_name} ADD COLUMN `{col}` VARCHAR(255)'
-                   conn.execute(alter_query)
-   else:
-        # Créer la table avec une colonne id auto-incrémentée en première position si elle n'existe pas
-        columns_definitions = [Column("id", Integer, primary_key=True, autoincrement=True)] + \
-                             [Column(col, String(255)) for col in columns]
-        table = Table(table_name, metadata, *columns_definitions)
-        metadata.create_all(engine)
-
-def load_data_to_db(file_path: str, table_name="data"):
-    """
-    Charge les données depuis un fichier .txt dans la base de données.
-    """
-    # Détecter les colonnes en utilisant la première ligne
-    columns = detect_columns(file_path)
-    update_table_structure(table_name, columns)
-    # Lecture des données en chunks en ignorant la première ligne
-    with open(file_path, "r", encoding="utf-8") as file:
-        file.readline()  # Ignorer la première ligne qui contient les en-têtes
-        for processed_lines in read_large_file(file):
-            df = pd.DataFrame(processed_lines, columns=columns)
-            df.to_sql(table_name, con=engine, if_exists="append", index=False)
-
-
-def read_large_file(file, chunk_size: int = 1024 * 1024):
-    """
-    Lit un fichier en chunks pour économiser la mémoire.
+    Lit le fichier par morceaux pour éviter la surcharge mémoire.
     """
     while True:
-        chunk = file.read(chunk_size)
+        chunk = file_object.read(chunk_size)
         if not chunk:
             break
-        lines = chunk.splitlines()
-        processed_lines = [process_line(line) for line in lines if process_line(line)]
-        yield processed_lines
+        yield chunk
 
 
-# UID = ID LIN
+def clean_line(line: str) -> Union[list[str], None]:
+    """
+    Nettoie une ligne de texte en :
+    - Remplaçant les espaces autour des pipes par des virgules pour conserver les séparateurs.
+    - Réduisant les espaces multiples en un seul espace.
+    - Ignorant les lignes composées uniquement de séparateurs ou de caractères vides.
+    Retourne une liste des valeurs si la ligne est valide, sinon None.
+    """
+    line = re.sub(r"\s*\|\s*", ",", line.strip())
+    line = re.sub(r"\s{2,}", " ", line)
+    line = re.sub(r"\s+", " ", line)
+    if not line or re.fullmatch(r"[,\s]*", line):
+        return None
+    return line.split(",")
+
+
+def process_file(file_path: str, output_csv: str, chunk_size: int = 4096) -> bool:
+    """
+    Lit un gros fichier texte, nettoie les lignes, les charge dans un DataFrame et les écrit dans un CSV.
+    """
+    data = []  # Liste pour accumuler les données temporairement
+    batch_size = 10000  # Taille du lot pour limiter l'utilisation de la mémoire
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as file_object:
+            for chunk in read_by_chunk(file_object, chunk_size):
+                lines = chunk.splitlines()
+                for line in lines:
+                    cleaned_line = clean_line(line)
+                    if cleaned_line is not None:
+                        data.append(cleaned_line)
+                    # Écrire par lots pour ne pas surcharger la mémoire
+                    if len(data) >= batch_size:
+                        df = pd.DataFrame(data)
+                        df.to_csv(output_csv, mode="a", index=False, header=False)
+                        data.clear()  # Vider le batch une fois écrit
+            # Écrire les lignes restantes après la dernière itération
+            if data:
+                df = pd.DataFrame(data)
+                df.to_csv(output_csv, mode="a", index=False, header=False)
+    except FileNotFoundError:
+        return False
+    return True

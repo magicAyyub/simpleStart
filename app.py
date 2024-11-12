@@ -1,94 +1,168 @@
-import os
-from flask import Flask, request, render_template, send_file
-from data_processor import load_data_to_db
-from sqlalchemy import create_engine
-import dask.dataframe as dd
+import os,shutil
+import json
 import pandas as pd
+from flask import Flask, request, render_template, send_file, jsonify
+from data_processor import process_file
+from sqlalchemy import create_engine
+from werkzeug.utils import secure_filename
+
 
 app = Flask(__name__)
 engine = create_engine("mysql://user:password@localhost:3306/db")
+UPLOAD_FOLDER = "./tmp"
+PROCESSED_CSV = "processed_data.csv"
+
+# Ensure the tmp folder exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
 @app.route("/", methods=["GET"])
 def index():
-    # Chaîne de connexion directe pour Dask
-    connection_string = "mysql://user:password@localhost:3306/db"
-
-    # Lire les 1000 première lignes de la  table en spécifiant "ID_CCU" comme index
-    df = dd.read_sql_table("data", connection_string, index_col="id")
-
-    # Convertir le Dask DataFrame en Pandas DataFrame
-    df_pandas = df.compute()
-
-    # Convertir l'index "ID_CCU" en une colonne normale
-    df_pandas.reset_index(inplace=True)
-
-    # Convertir le Pandas DataFrame en un dictionnaire
-    data = df_pandas.to_dict("records")
-    headers = df_pandas.columns.tolist()
+    data = None
+    headers = None
+    # Clean tmp folder
+    for filename in os.listdir(UPLOAD_FOLDER):
+        file_path = os.path.join(UPLOAD_FOLDER, filename)
+        if os.path.isfile(file_path) or os.path.islink(file_path):
+            os.unlink(file_path)
     return render_template("index.html", data=data, headers=headers)
 
 @app.route("/add", methods=["GET"])
-def upload():
+def add():
     return render_template("add.html")
 
-# Route pour traiter l'upload
-@app.route('/upload_csv', methods=['POST'])
-def upload_csv():
+# CSV search
+@app.route('/fill_csv', methods=['POST'])
+def fill_csv():
     if 'csv_file' not in request.files:
-        return 'No file part'
+        return jsonify({'error': 'No file part'}), 400
     file = request.files['csv_file']
     if file.filename == '':
-        return 'No selected file'
+        return jsonify({'error': 'No selected file'}), 400
     if file and file.filename.endswith('.csv'):
-        # Charger le fichier CSV
-        file_path = os.path.join("./uploads", file.filename)
-        file.save(file_path)
-        # Lire le fichier CSV dans un DataFrame
-        input_df = pd.read_csv(file_path)
-        # Obtenir la liste des colonnes spécifiées par l'utilisateur dans le CSV
-        column_names = input_df.columns.tolist()
-        # Construire une liste pour stocker les parties de la requête
-        union_queries = []
-        # Pour chaque ligne du fichier CSV, construire la partie de requête SQL dynamiquement
-        for _, row in input_df.iterrows():
-            # Construire la condition WHERE pour chaque colonne spécifiée
-            conditions = [
-                f"{col} = '{row[col]}'" for col in column_names
-            ]
-            # Joindre les conditions avec 'AND' pour cette ligne
-            where_clause = " AND ".join(conditions)
-            # Ajouter une partie de requête SQL pour cette ligne
-            union_queries.append(f"SELECT * FROM data WHERE {where_clause}")
-        # Joindre toutes les parties de la requête avec UNION ALL
-        full_query = " UNION ALL ".join(union_queries)
-        print(full_query)
-        # Exécuter la requête complète pour obtenir tous les résultats en un seul appel
-        final_df = pd.read_sql(full_query, engine)
-        # Sauvegarder le DataFrame final dans un nouveau fichier CSV
-        output_path = "./uploads/filtered_results.csv"
-        final_df.to_csv(output_path, index=False)
-        # Supprimer le fichier original après traitement
-        os.remove(file_path)
-        # Renvoyer le fichier CSV filtré
-        return send_file(output_path, as_attachment=True, download_name="filled_data.csv")
+        try:
+            # Charger le fichier CSV
+            file_path = os.path.join("./tmp", file.filename)
+            file.save(file_path)
+ 
+            # Lire le fichier CSV dans un DataFrame
+            input_df = pd.read_csv(file_path)
+            column_names = input_df.columns.tolist()
+            union_queries = []
+ 
+            for _, row in input_df.iterrows():
+                conditions = [f"{col} = '{row[col]}'" for col in column_names]
+                where_clause = " AND ".join(conditions)
+                union_queries.append(f"SELECT * FROM data WHERE {where_clause}")
+ 
+            full_query = " UNION ALL ".join(union_queries)
+            final_df = pd.read_sql(full_query, engine)
+            final_df = final_df.drop_duplicates(subset=[
+            'FIRST_NAME', 'LAST_NAME', 'EMAIL', 'BIRTH_DATE', 'ID_CCU'])
+            output_path = "./tmp/filtered_results.csv"
+            final_df.to_csv(output_path, index=False)
+            os.remove(file_path)
+ 
+            return send_file(output_path, as_attachment=True, download_name="filled_data.csv")
+        
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
     else:
-        return 'Invalid file format'
+        return jsonify({'error': 'Invalid file format'}), 400
         
 
+# Simple search
+@app.route('/search', methods=['POST'])
+def search():
+    # Extract form data from the request
+    form_data = request.json  # Assuming the frontend sends JSON data
+ 
+    # Define the column names as per your database (these are placeholders)
+    with open('static/jsons/db_search_columns.json') as json_file:
+        db_columns = json.load(json_file)
+ 
+        # Filter out empty fields, so only filled fields are included in the query
+        query_conditions = []
+        for key, value in form_data.items():
+            if value:  # Only add to conditions if the field is not empty
+                db_column = db_columns.get(key)
+                if db_column:
+                    query_conditions.append(f"{db_column} = '{value}'")
+    
+        # Ensure at least one field is filled
+        if not query_conditions:
+            return jsonify({'error': 'At least one search field must be filled in.'}), 400
+    
+        # Build the SQL query with dynamic WHERE clause
+        where_clause = " AND ".join(query_conditions)
+        query = f"SELECT * FROM data WHERE {where_clause}"
+        try:
+            # Execute the query and get the result in a DataFrame
+            results_df = pd.read_sql(query, engine)
 
-# Route pour traiter l'upload
-@app.route("/add", methods=["POST"])
-def upload_file():
-    if request.method == "POST":
-        file = request.files["upload_file"]
-        file_path = os.path.join("./uploads", file.filename)
+            results_df = results_df.drop_duplicates(subset=[
+                'EMAIL', 'BIRTH_DATE', 'ID_CCU','UUID'])
+            # Convert the DataFrame to a list of dictionaries for JSON response
+            results = results_df.to_dict(orient='records')
+            return jsonify({'results': results})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+    
+
+
+ 
+@app.route('/process_file', methods=['POST'])
+def process_file_endpoint():
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No selected file'}), 400
+    if file and file.filename.endswith('.txt'):
+        file_path = os.path.join(UPLOAD_FOLDER, secure_filename(file.filename))
         file.save(file_path)
-        # Lancer le traitement et chargement en BDD
-        load_data_to_db(file_path)
-        # Supprimer le fichier après traitement
-        os.remove(file_path)
-        return "Fichier chargé et traité avec succès."
+ 
+        # Process the text file to CSV
+        output_csv = os.path.join(UPLOAD_FOLDER, PROCESSED_CSV)
+        if process_file(file_path, output_csv):
+            os.remove(file_path)  # Clean up the original text file
+            return jsonify({'message': 'File processed successfully'})
+        else:
+            return jsonify({'error': 'File processing failed'}), 500
+    else:
+        return jsonify({'error': 'Invalid file format'}), 400
+ 
+@app.route('/download_csv', methods=['GET'])
+def download_csv():
+    csv_path = os.path.join(UPLOAD_FOLDER, PROCESSED_CSV)
+    if os.path.exists(csv_path):
+        return send_file(csv_path, as_attachment=True, download_name=PROCESSED_CSV)
+    return jsonify({'error': 'Processed CSV not found'}), 404
+ 
+@app.route('/load_data', methods=['POST'])
+def load_data():
+    csv_path = os.path.join(UPLOAD_FOLDER, PROCESSED_CSV)
+    if not os.path.exists(csv_path):
+        return jsonify({'error': 'Processed CSV not found'}), 404
+ 
+    try:
+        # Define chunksize for reading and writing
+        chunksize = 10000  # Load 10,000 rows at a time
+        # Disable indexes temporarily for faster bulk insert, if supported
+        with engine.begin() as connection:
+            connection.execute("ALTER TABLE data DISABLE KEYS")  # MySQL syntax
+ 
+            # Load CSV data in chunks to avoid memory issues
+            for chunk in pd.read_csv(csv_path, chunksize=chunksize):
+                chunk.to_sql('data', connection, if_exists='append', index=False, chunksize=chunksize)
+ 
+            # Re-enable indexes after loading is complete
+            connection.execute("ALTER TABLE data ENABLE KEYS")  # MySQL syntax
+            # For PostgreSQL, use "ALTER TABLE data SET LOGGED"
+ 
+        return jsonify({'message': 'Data loaded into the database successfully'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
