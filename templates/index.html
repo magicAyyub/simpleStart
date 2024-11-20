@@ -3,15 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Data interface</title>
+    <title>Interface web de recherche</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/logo.png')}}" type="image/x-icon">
 </head>
 <body class="bg-gray-100">
+    <style>
+        .disabled {
+    pointer-events: none;
+    opacity: 0.5;
+}
+      </style>
     <div class="container mx-auto p-4 space-y-8 max-w-4xl">
-        <h1 class="text-3xl font-bold mb-6 text-center">Data interface</h1>
-
-        <div class="bg-white shadow-md rounded-lg p-6">
+        <h1 class="text-3xl font-bold mb-6 text-center">Interface web de recherche</h1>
+        
+        <div class="bg-white shadow-md rounded-lg p-6 relative">
+            <div id="alert-border-2" class="hidden flex items-center p-4 mb-4 text-red-800 border-t-4 border-red-300 bg-red-50 dark:text-red-400 dark:bg-gray-800 dark:border-red-800" role="alert">
+                <svg class="flex-shrink-0 w-4 h-4" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 .5a9.5 9.5 0 1 0 9.5 9.5A9.51 9.51 0 0 0 10 .5ZM9.5 4a1.5 1.5 0 1 1 0 3 1.5 1.5 0 0 1 0-3ZM12 15H8a1 1 0 0 1 0-2h1v-3H8a1 1 0 0 1 0-2h2a1 1 0 0 1 1 1v4h1a1 1 0 0 1 0 2Z"/>
+                </svg>
+                <div class="ms-3 text-sm font-medium" id="alertMessage">
+                    <!-- error message will be here -->
+                </div>
+                <button type="button" class=" closeAlert ms-auto -mx-1.5 -my-1.5 bg-red-50 text-red-500 rounded-lg focus:ring-2 focus:ring-red-400 p-1.5 hover:bg-red-200 inline-flex items-center justify-center h-8 w-8 dark:bg-gray-800 dark:text-red-400 dark:hover:bg-gray-700"  data-dismiss-target="#alert-border-2" aria-label="Close">
+                    <span class="sr-only">Dismiss</span>
+                    <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                    </svg>
+                </button>
+            </div>
 
             <!-- Search Type Selection -->
             <div class="mb-6">
@@ -37,7 +58,7 @@
             </div>
 
             <!-- Form to search-->
-            <form id="searchForm" class="space-y-4 max-w-2xl mx-auto">
+            <form id="searchForm" class="space-y-4 max-w-2xl mx-auto relative">
 
                 <!-- Simple search -->
                 <div id="simpleSearchFields" class="hidden">
@@ -54,10 +75,14 @@
                     <div>
                         <label for="email" class="block text-sm font-medium text-gray-700 mb-1">Email</label>
                         <input type="email" id="email" name="email" placeholder="Ex: marie.dupont@email.com" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
+                    </div>   
+                    <div class="flex items-center mt-3">
+                        <input id="like"  name="like" type="checkbox" value="" class="w-4 h-4 text-blue-600 bg-purple-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-purple-700 dark:border-gray-600">
+                        <label for="like" class="ms-2 text-sm font-medium text-gray-500">Recherche flexible</label>
                     </div>
-                    <div id="moreFields" class="hidden space-y-4">
+                    <div id="moreFields" class="hidden space-y-4 mt-4">
                         <div>
-                            <label for="dateNaissance" class="block text-sm font-medium text-gray-700 mb-1">Date de naissance</label>
+                            <label for="dateNaissance" class="block text-sm font-medium text-gray-3=700 mb-1">Date de naissance</label>
                             <input type="date" id="dateNaissance" name="dateNaissance" class="w-full px-3 py-2 placeholder-gray-400 border border-gray-300 rounded-md focus:outline-none focus:ring focus:ring-blue-100 focus:border-blue-300">
                         </div>
                         <div>
@@ -105,16 +130,41 @@
                         <i class="fas fa-search mr-2"></i>
                         Lancer la recherche
                     </button>
-                    <button id="uploadCSV" type="submit" class="hidden flex-1 px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition duration-150 ease-in-out">
+                    <button id="uploadCSV" class="hidden flex-1 px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-50 transition duration-150 ease-in-out">
                         <i class="fas fa-search mr-2"></i>
                         Upload CSV
                     </button>
                 </div>
+                
+                <!-- Form clean icon -->
+                <div class="absolute top-[-35px] right-[-8px] cursor-pointer flex items-center justify-center w-12 h-12  rounded-full" id="clean">
+                    <svg viewBox="0 0 1024 1024" class="icon w-6 h-6 text-black" version="1.1" xmlns="http://www.w3.org/2000/svg" fill="#000000">
+                        <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+                        <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+                        <g id="SVGRepo_iconCarrier">
+                            <path d="M864.453 386.372H604.968V135.834c0-39.533-32.049-71.582-71.582-71.582h-35.791c-39.533 0-71.582 32.049-71.582 71.582v250.538H166.527c-34.592 0-62.634 28.042-62.634 62.634 0 30.327 21.556 55.617 50.181 61.392L85.997 833.761c0 49.417 35.791 90.596 89.478 89.478 53.687-1.118 85.893-53.687 156.91-53.687 172.801 0 397.852 53.687 397.852 53.687 49.417 0 89.478-40.061 89.478-89.478l68.827-326.927c22.634-9.439 38.547-31.772 38.547-57.828-0.001-34.591-28.043-62.634-62.636-62.634zM461.803 153.73c0-29.651 24.036-53.687 53.687-53.687 29.651 0 53.687 24.036 53.687 53.687v232.642H461.803V153.73z m319.456 662.753c-11.092 41.902-31.537 70.965-70.44 70.965 0 0-197.096-49.497-355.544-53.438l41.811-142.707c2.779-9.485-2.658-19.427-12.142-22.207-9.485-2.777-19.426 2.658-22.205 12.142l-45.103 153.939c-55.562 8.478-102.763 52.27-142.161 52.27-43.62 0-67.243-33.993-53.687-70.965 13.556-36.974 74.247-305.459 74.247-305.459l641.576 0.617c-0.001 0.001-45.261 262.941-56.352 304.843z m83.194-340.633H166.527c-14.825 0-26.843-12.019-26.843-26.843 0-14.825 12.019-26.843 26.843-26.843h697.927c14.825 0 26.843 12.019 26.843 26.843s-12.019 26.843-26.844 26.843z" fill="#000000"></path>
+                        </g>
+                    </svg>
+                </div>
             </form>
+
+            <!-- Add icon -->
+            <a href="/add">
+                <div class="absolute top-[-20px] right-[-5px] flex items-center justify-center w-12 h-12 bg-black text-white rounded-full">    
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <g id="SVGRepo_bgCarrier" stroke-width="0"></g>
+                        <g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g>
+                        <g id="SVGRepo_iconCarrier"> 
+                            <path d="M15 12L12 12M12 12L9 12M12 12L12 9M12 12L12 15" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"></path> 
+                            <path d="M7 3.33782C8.47087 2.48697 10.1786 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 10.1786 2.48697 8.47087 3.33782 7" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round"></path> 
+                        </g>
+                    </svg>     
+                </div>
+            </a> 
         </div>
 
         <!-- Display results -->
-        <div id="resultsSection" class="bg-white shadow-md rounded-lg p-6 mt-8 hidden">
+        <div id="resultsSection" class="bg-white shadow-md rounded-lg p-6 mt-8 hidden relative">
             <h2 class="text-xl font-semibold mb-4">Résultats de la recherche <span id="resultCount" class="bg-purple-100 text-purple-800 text-xs font-medium me-2 px-2.5 py-0.5 rounded dark:bg-purple-900 dark:text-purple-300">0 Résultat</span></h2>
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
@@ -126,13 +176,34 @@
                     </tbody>
                 </table>
             </div>
+
+            <div aria-label="Page navigation" id="paginationControls" class="mt-5">
+                <ul class="inline-flex -space-x-px text-sm">
+                  <span id="prevPage" onclick="changePage(-1)" class="cursor-pointer flex items-center justify-center px-3 h-8 ms-0 leading-tight text-gray-500 bg-white border border-e-0 border-gray-300 rounded-s-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
+                    <svg class="w-2.5 h-2.5 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 1 1 5l4 4"/>
+                      </svg>
+                  </span>
+                  <span id="currentPage" class="flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
+                    Page 1
+                  </span>
+                  <span id="nextPage" onclick="changePage(1)" class="cursor-pointer flex items-center justify-center px-3 h-8 leading-tight text-gray-500 bg-white border border-gray-300 rounded-e-lg hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white">
+                    <svg class="w-2.5 h-2.5 rtl:rotate-180" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 6 10">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 9 4-4-4-4"/>
+                      </svg>
+                  </span>
+                </ul>
+            </div>
         </div>
+
+
 
         <div class="text-center mt-8">
             <span id="searchCount" class="text-lg font-semibold">0 recherches effectuées</span>
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ url_for('static', filename='js/index.js') }}"></script>
 </body>
 </html>

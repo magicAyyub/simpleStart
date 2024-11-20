@@ -15,12 +15,25 @@ const resultsBody = document.getElementById('resultsBody');
 const searchCount = document.getElementById('searchCount');
 const uploadButton = document.getElementById('uploadCSV');
 const statusMessage = document.getElementById('statusMessage');
+const alertMessage = document.getElementById('alertMessage');
+const alertCloseButtons = document.querySelectorAll('.closeAlert');
 const searchButtons = [simpleSearchBtn, csvSearchBtn, regexSearchBtn];
 const resultCount = document.getElementById('resultCount');
+const likeSearchCheckBox = document.getElementById('like');
+const cleanFormButton = document.getElementById('clean');
 
 
-let currentSearchType = 'simple';
+const resultsPerPage = 30;  // Set the limit of results per page
+let searchCache = {};
+let totalPageCount = 0; // To track the total number of pages
 let searchCounter = 0;
+let likeSearch = false;
+let previousPage = 1; 
+let currentPage = 1;  // Track the current page
+let currentSearchType = 'simple';
+let totalResult = 0;
+let currentTotal = -resultsPerPage;
+let isTotalChange = true;
 
 
 function showSearchFields(type) {
@@ -68,11 +81,28 @@ simpleSearchBtn.addEventListener('click', () => showSearchFields('simple'));
 csvSearchBtn.addEventListener('click', () => showSearchFields('csv'));
 regexSearchBtn.addEventListener('click', () => showSearchFields('regex'));
 
+likeSearchCheckBox.addEventListener('change', () => {
+    likeSearch = likeSearchCheckBox.checked;
+    likeSearchCheckBox.value = '1' ? likeSearch : '0';
+});
+
 toggleMoreFieldsBtn.addEventListener('click', () => {
     moreFields.classList.toggle('hidden');
     toggleMoreFieldsBtn.innerHTML = moreFields.classList.contains('hidden') ? 
         `<i class="fas fa-chevron-down mr-2"></i> Plus de critères` : 
         `<i class="fas fa-chevron-up mr-2"></i> Moins de critères`;
+});
+
+cleanFormButton.addEventListener('click', () => {
+    searchForm.reset(); 
+    document.querySelector('#regex').value = '';
+    selectedFileName.textContent = '';
+});
+
+alertCloseButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        alertMessage.parentElement.classList.add('hidden');
+    });
 });
 
 
@@ -85,10 +115,12 @@ csvFileInput.addEventListener('change', (event) => {
     }
 });
 
+// CSV search
 uploadButton.addEventListener('click', async (e) => {
+    preventDefaults(e);
     const file = csvFileInput.files[0];
     if (!file) {
-        statusMessage.textContent = "Please select a file before uploading.";
+        showError("Veuillez d'abord sélectionner un fichier CSV");
         return;
     }
 
@@ -113,88 +145,224 @@ uploadButton.addEventListener('click', async (e) => {
             a.remove();
             statusMessage.textContent = "File processed and downloaded successfully.";
         } else {
+            showError('Une erreur est survenue, veuillez réessayer plus tard.');
             const errorData = await response.json();
-            statusMessage.textContent = `Error: ${errorData.error}`;
+            console.error( `Error: ${errorData.error}`)
         }
     } catch (error) {
         statusMessage.textContent = `Error: ${error.message}`;
     }
 });
 
-function updateSubmitButtonState() {
-    submitButton.disabled = currentSearchType === 'csv' && !csvFileInput.files.length;
-    submitButton.style.cursor = submitButton.disabled ? 'not-allowed' : 'pointer';
-}
 
-async function displayResults(results) {
+ 
+async function fetchResults(page = 1) {
+    const formData = new FormData(searchForm);
+    const data = Object.fromEntries(formData.entries());
+
+ 
+    if (!is_empty(data)) {
+        // Add pagination parameters
+        data.page = page;
+        data.limit = resultsPerPage;
+ 
+        // Check if the page is cached
+        if (searchCache[page]) {
+            displayResults(searchCache[page], page, totalResult);
+            return;
+        }
+ 
+        try {
+            // Fetch results from the server
+            const response = await fetch('/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(data)
+            });
+ 
+            const result = await response.json();
+ 
+            if (response.ok) {
+                // Cache the results for the page
+                searchCache[page] = result.results;
+
+                if (isTotalChange) {
+                    totalResult = result.total_count;
+                    isTotalChange = false;
+                }
+                totalPageCount = Math.ceil(totalResult / resultsPerPage);
+ 
+                // Display the results
+                displayResults(result.results, page, totalResult);
+ 
+                // Update pagination controls
+                updatePaginationControls(page, totalPageCount);
+            } else {
+                showError('Une erreur est survenue, veuillez réessayer plus tard.');
+                console.error(result.error);
+            }
+        } catch (error) {
+            showError('Une erreur est survenue, veuillez réessayer plus tard.');
+            console.error('Error:', error);
+        }
+    } else {
+        showError("Au moins un champ de recherche doit être rempli.");
+    }
+}
+ 
+// Function to display results
+async function displayResults(results, page, totalCount) {
     const resultsSection = document.getElementById('resultsSection');
     const resultsHeader = document.getElementById('resultsHeader');
     const resultsBody = document.getElementById('resultsBody');
+    const paginationControls = document.getElementById('paginationControls');
+    const currentPageDisplay = document.getElementById('currentPage');
+    const resultCountDisplay = document.getElementById('resultCount');
  
     if (results.length === 0) {
         resultsSection.classList.add('hidden');
+        paginationControls.classList.add('hidden');
         alert("No results found");
         return;
     }
+
+    currentTotal = (page < currentPage) ? currentTotal - results.length : currentTotal + results.length
+    
  
-    // Show the results section
+    // Show the results section and pagination controls
     resultsSection.classList.remove('hidden');
+    paginationControls.classList.remove('hidden');
+ 
+    // Scroll to the results section
+    resultsSection.scrollIntoView({ behavior: 'smooth', block: 'end' });
+ 
+    // Update result count display
+    resultCountDisplay.textContent = `${currentTotal} sur ${totalCount} résultats`;
+ 
+    // Set the current page display
+    currentPageDisplay.textContent = `Page ${page}`;
  
     // Clear previous results
     resultsHeader.innerHTML = '';
     resultsBody.innerHTML = '';
-      
-
-    // Define the desired order of columns
-    const columnOrderResponse =  await fetch('static/jsons/db_columns.json');
+ 
+    // Fetch column order
+    const columnOrderResponse = await fetch('static/jsons/db_columns.json');
     const columnOrder = await columnOrderResponse.json();
  
     // Generate table headers based on the column order
-    const headerRow = columnOrder.map(header => 
+    const headerRow = columnOrder.map(header =>
         `<th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${header}</th>`
     ).join('');
     resultsHeader.innerHTML = `<tr>${headerRow}</tr>`;
  
     // Populate the table rows with the results in the specified order
     results.forEach(result => {
-        const row = columnOrder.map(header => 
+        const row = columnOrder.map(header =>
             `<td class="px-6 py-4 whitespace-nowrap">${result[header] || ''}</td>`
         ).join('');
         resultsBody.innerHTML += `<tr>${row}</tr>`;
     });
-    resultCount.textContent = `${results.length} résultats`;
+}
+ 
+// Function to update pagination controls
+function updatePaginationControls(currentPage, totalPages) {
+    console.log(`${currentPage} : ${totalPages}`);
+    const prevPageButton = document.getElementById('prevPage');
+    const nextPageButton = document.getElementById('nextPage');
+ 
+    // Enable or disable "Previous" button
+    if (currentPage > 1) {
+        prevPageButton.classList.remove('disabled');
+        prevPageButton.classList.add('cursor-pointer');
+    } else {
+        prevPageButton.classList.add('disabled');
+        prevPageButton.classList.remove('cursor-pointer');
+    }
+ 
+    // Enable or disable "Next" button
+    if (currentPage < totalPages) {
+        nextPageButton.classList.remove('disabled');
+        nextPageButton.classList.add('cursor-pointer');
+    } else {
+        nextPageButton.classList.add('disabled');
+        nextPageButton.classList.remove('cursor-pointer');
+    }
+}
+ 
+ 
+function changePage(page) {
+    previousPage = currentPage - 1;
+    currentPage = (page < 0) ? previousPage : currentPage + page;
+    searchByPage(currentPage)
 }
 
 
+function showError(message) {
+    alertMessage.textContent = message;
+    alertMessage.parentElement.classList.remove('hidden');
+}
+
+function is_empty(obj) {
+    let count = 0;
+    for (let key in obj) {
+        if (obj[key] !== "" && obj[key] !== null && obj[key] !== undefined) {
+            count++;
+        }
+    }
+    return count == 0;
+}
+
+function updateSubmitButtonState() {
+    submitButton.disabled = currentSearchType === 'csv' && !csvFileInput.files.length;
+    submitButton.style.cursor = submitButton.disabled ? 'not-allowed' : 'pointer';
+}
+// Trigger the search on form submit
 searchForm.addEventListener('submit', async (event) => {
     event.preventDefault();
+ 
     searchCounter++;
     searchCount.textContent = `${searchCounter} recherches effectuées`;
  
-    const formData = new FormData(searchForm);
-    const data = Object.fromEntries(formData.entries());
- 
-    try {
-        const response = await fetch('/search', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(data)
-        });
- 
-        const result = await response.json();
-        if (response.ok) {
-            // Display the results
-            displayResults(result.results);
-
-        } else {
-            console.error(result.error);
-        }
-    } catch (error) {
-        console.error('Error:', error);
-    }
+    searchCache = {}; // Clear the cache for a new search
+    currentPage = 1; // Reset to the first page
+    isTotalChange = true;
+    searchByPage(currentPage);
 });
+
+async function searchByPage(page) {
+        // Display SweetAlert loading dialog
+        Swal.fire({
+            title: 'Recherche en cours',
+            html: 'Veuillez patienter pendant que nous récupérons les résultats...',
+            allowOutsideClick: false,
+            didOpen: () => {
+                Swal.showLoading();
+            },
+        });
+    
+     
+        try {
+            // Trigger the search operation
+            await fetchResults(page);
+     
+            // Close SweetAlert after the search completes
+            Swal.close();
+     
+            // Optionally scroll to results section
+            const resultSection = document.getElementById('resultsSection');
+            resultSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } catch (error) {
+            // Show an error message if the search fails
+            Swal.fire({
+                icon: 'error',
+                title: 'Erreur',
+                text: 'Une erreur est survenue lors de la recherche.',
+            });
+        }
+}
 
 // Drag-and-Drop Functionality
 const dropZone = document.querySelector('label[for="csvFile"]');

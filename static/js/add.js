@@ -5,11 +5,12 @@ const downloadCSV = document.getElementById('downloadCSV');
 const loadData = document.getElementById('loadData');
 const txtFileInput = document.getElementById('txtFile');
 const submitButton = document.getElementById('processButton');
+const alertCloseButtons = document.querySelectorAll('.closeAlert');
  
 processButton.addEventListener('click', async () => {
     const file = txtFileInput.files[0];
     if (!file) {
-        alert("Please select a text file.");
+        showError("Veuillez sélectionner un fichier texte (.txt).");
         return;
     }
  
@@ -31,7 +32,7 @@ processButton.addEventListener('click', async () => {
     if (response.ok) {
         resultSection.classList.remove('hidden');
     } else {
-        alert("Error processing file");
+        showError("Erreur de traitement du fichier.");
     }
 });
  
@@ -40,37 +41,44 @@ downloadCSV.addEventListener('click', () => {
     window.location.href = '/download_csv';
 });
  
-// Load CSV data into the database
 loadData.addEventListener('click', async () => {
+    const tableName = prompt('Quel est le nom de table à charger ? (Elle Sera crée si elle n\'existe pas.', 'data');
+    if (!tableName) {
+        showError("Le nom de la table est obligatoire.");
+        return;
+    }
+ 
     // Show loader during data loading
     loader.classList.remove('hidden');
     resultSection.classList.add('hidden');
  
-    // Trigger data load in the backend
-    const response = await fetch('/load_data', { method: 'POST' });
+    // Prepare the form data
+    const formData = new FormData();
+    formData.append('table_name', tableName);
  
-    // Hide loader when done and show success or error message
-    loader.classList.add('hidden');
-    if (response.ok) {
-        alert("Data loaded successfully into the database.");
-    } else {
-        alert("Error loading data into the database.");
+    try {
+        // Trigger data load in the backend
+        const response = await fetch('/load_data', {
+            method: 'POST',
+            body: formData,
+        });
+ 
+        // Hide loader when done and show success or error message
+        loader.classList.add('hidden');
+        if (response.ok) {
+            alert("Donnée chargées avec succès dans la base de donnée.");
+        } else {
+            const error = await response.json();
+            showError(`Une erreur est survenue, veuillez réessayer plus tard.`);
+            console.error(`Error loading data into the database: ${error.error}`)     
+        }
+    } catch (error) {
+        loader.classList.add('hidden');
+        showError(`Une erreur est survenue, veuillez réessayer plus tard.`);
+        console.error(`Unexpected error: ${error.message}`);
     }
-});
-// Download the processed CSV
-downloadCSV.addEventListener('click', () => {
-    window.location.href = '/download_csv';
 });
 
-// Load CSV data into the database
-loadData.addEventListener('click', async () => {
-    const response = await fetch('/load_data', { method: 'POST' });
-    if (response.ok) {
-        alert("Data loaded successfully into the database.");
-    } else {
-        alert("Error loading data into the database.");
-    }
-});
 
 // Drag-and-Drop Functionality
 const csvFileInput = document.getElementById('txtFile');
@@ -82,7 +90,6 @@ csvFileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (file) {
         selectedFileName.textContent = `Fichier sélectionné : ${file.name}`;
-        statusMessage.textContent = "";
         updateSubmitButtonState();
     }
 });
@@ -90,6 +97,17 @@ csvFileInput.addEventListener('change', (event) => {
 function updateSubmitButtonState() {
     submitButton.style.cursor = submitButton.disabled ? 'not-allowed' : 'pointer';
 }
+
+function showError(message) {
+    alertMessage.textContent = message;
+    alertMessage.parentElement.classList.remove('hidden');
+}
+
+alertCloseButtons.forEach(button => {
+    button.addEventListener('click', () => {
+        alertMessage.parentElement.classList.add('hidden');
+    });
+});
 
 const dropZone = document.querySelector('label[for="txtFile"]');
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
